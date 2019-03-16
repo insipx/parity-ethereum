@@ -111,7 +111,7 @@ pub struct StateDB {
 	/// Shared canonical state cache.
 	account_cache: Arc<Mutex<AccountCache>>,
 	/// DB Code cache. Maps code hashes to shared bytes.
-	code_cache: Arc<Mutex<MemoryLruCache<H256, Arc<Vec<u8>>>>>,
+	code_cache: MemoryLruCache<H256, Arc<Vec<u8>>>,
 	/// Local dirty cache.
 	local_cache: Vec<CacheQueueItem>,
 	/// Shared account bloom. Does not handle chain reorganizations.
@@ -144,7 +144,7 @@ impl StateDB {
 				accounts: LruCache::new(cache_items),
 				modifications: VecDeque::new(),
 			})),
-			code_cache: Arc::new(Mutex::new(MemoryLruCache::new(code_cache_size))),
+			code_cache: MemoryLruCache::new(code_cache_size),
 			local_cache: Vec::new(),
 			account_bloom: bloom,
 			cache_size: cache_size,
@@ -361,7 +361,7 @@ impl StateDB {
 		// TODO: account for LRU-cache overhead; this is a close approximation.
 		self.db.mem_used() + {
 			let accounts = self.account_cache.lock().accounts.len();
-			let code_size = self.code_cache.lock().current_size();
+			let code_size = self.code_cache.current_size();
 			code_size + accounts * ::std::mem::size_of::<Option<Account>>()
 		}
 	}
@@ -420,10 +420,8 @@ impl state::Backend for StateDB {
 		})
 	}
 
-	fn cache_code(&self, hash: H256, code: Arc<Vec<u8>>) {
-		let mut cache = self.code_cache.lock();
-
-		cache.insert(hash, code);
+	fn cache_code(&mut self, hash: H256, code: Arc<Vec<u8>>) {
+		self.code_cache.insert(hash, code);
 	}
 
 	fn get_cached_account(&self, addr: &Address) -> Option<Option<Account>> {
@@ -448,10 +446,8 @@ impl state::Backend for StateDB {
 		})
 	}
 
-	fn get_cached_code(&self, hash: &H256) -> Option<Arc<Vec<u8>>> {
-		let mut cache = self.code_cache.lock();
-
-		cache.get_mut(hash).map(|code| code.clone())
+	fn get_cached_code(&mut self, hash: &H256) -> Option<Arc<Vec<u8>>> {
+		self.code_cache.get_mut(hash).map(|code| code.clone())
 	}
 
 	fn note_non_null_account(&mut self, address: &Address) {

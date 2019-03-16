@@ -29,6 +29,7 @@ use std::hash::Hash;
 const INITIAL_CAPACITY: usize = 4;
 
 /// An LRU-cache which operates on memory used.
+#[derive(Clone)]
 pub struct MemoryLruCache<K: Eq + Hash, V: HeapSizeOf> {
 	inner: LruCache<K, V>,
 	cur_size: usize,
